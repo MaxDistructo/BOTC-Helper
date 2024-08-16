@@ -1,10 +1,9 @@
 package io.dedyn.engineermantra.botchelper.bot
 
-import io.dedyn.engineermantra.shared.data.ConfigMySQL
+import io.dedyn.engineermantra.botchelper.bot.BotMain.managerStoryteller
 import net.dv8tion.jda.api.Permission
 import net.dv8tion.jda.api.entities.*
 import net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel
-import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleAddEvent
 import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent
 import net.dv8tion.jda.api.hooks.ListenerAdapter
@@ -18,12 +17,12 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
             "ping"-> event.reply("Pong!").setEphemeral(true).flatMap{
                 event.hook.editOriginalFormat("Pong: %d ms", System.currentTimeMillis() - time)} // then edit original
                 .queue()
-            "echo" -> event.reply(event.getOption("message")!!.asString).queue()
-            "goodmorning" -> moveToDay(event)
-            "goodnight" -> moveToNight(event)
             "summon" -> summonToVC(event)
             "goto" -> gotoMember(event)
-            "promote" -> promoteMember(event)
+            "spec" -> spectateMember(event)
+            "grim" -> handleGrim(event)
+            "storyteller" -> handleStoryteller(event)
+            "cottage" -> handleCottage(event)
             else -> println("Command not found ${event.name}")
         }
     }
@@ -55,36 +54,6 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
         return outputList
     }
 
-    /**
-     * Catches when someone is given the Booster role so and DMs them with the information on how to use the perks
-     * we provide to them for doing so.
-     */
-    override fun onGuildMemberRoleAdd(event: GuildMemberRoleAddEvent)
-    {
-        if(event.roles.contains(event.guild.boostRole))
-        {
-            //New Booster! Send them the information about the booster perks
-            val dms = event.member.user.openPrivateChannel().complete()
-            dms.sendMessage("**Thank You for boosting Salem Central!**\n\n" +
-                    "While you are boosting Salem Central, you will get the following perks. If there is another perk " +
-                    "added, it will be announced.\n" +
-                    "**Access to a Custom Role**\n" +
-                    "   - You may create your own custom role using the ```/role``` command with" +
-                    "${event.jda.selfUser.asMention}. This role may be updated as many times as you please with a custom color" +
-                    "and icon.\n" +
-                    "**Server Emoji/Soundboard**\n"+
-                    "   - Upon request, we will add almost any emoji or soundboard sound you wish. This is subject to staff" +
-                    "approval though as we cannot automate it."
-            ).queue()
-            val booster_info = ConfigMySQL.getBoosterItem(event.member.idLong, event.guild.idLong)
-            if(booster_info == null)
-            {
-                val role = event.guild.createRole().setName(event.member.effectiveName).complete()
-                event.guild.addRoleToMember(event.member, role).queue()
-                ConfigMySQL.addBoosterItem(event.member.idLong, event.guild.idLong, role.idLong)
-            }
-        }
-    }
     /**
      * Blood on the Clocktower Server commands
      * These are NOT enabled in most servers.
@@ -154,61 +123,94 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
         }
     }
 
-    fun promoteMember(event: SlashCommandInteractionEvent) {
-        if(event.guild == null)
-        {
-            return
+    fun spectateMember(event: SlashCommandInteractionEvent){
+        if(!event.member!!.effectiveName.startsWith('!')){
+            event.member!!.modifyNickname("!" + event.member!!.effectiveName).complete()
+            event.reply("You have been marked as a spectator").complete()
         }
-        val storytellerRole = event.guild!!.getRoleById(1165387353787990147L)!!
-        val frequentStoryteller = event.guild!!.getRoleById(1167701898212683786L)!!
-        if((event.member!!.hasPermission(Permission.MANAGE_ROLES) || event.member!!.roles.contains(frequentStoryteller)) && (!(event.member!!.roles.contains(storytellerRole)) || event.getOption("force")?.asBoolean == true))
-        {
-            for (member in event.guild!!.getMembersWithRoles(storytellerRole)) {
-                if (member.idLong != event.member!!.idLong) {
-                    event.guild!!.removeRoleFromMember(member, storytellerRole).queue()
+        if(event.getOption("user") != null){
+            BotMain.spectatorMap[event.member!!.idLong] = event.getOption("user")!!.asMember!!.idLong
+            event.reply("You are now spectating ${event.getOption("user")!!.asMember!!.asMention}").complete()
+        }
+    }
+
+    fun handleGrim(event: SlashCommandInteractionEvent){
+        if(BotMain.grimLink == ""){
+            event.reply("There is no grim currently set").queue()
+        }
+        else{
+            event.reply("The current grim is: ${BotMain.grimLink}").queue()
+        }
+    }
+
+    fun handleStoryteller(event: SlashCommandInteractionEvent){
+        when(event.subcommandName){
+            "claim" -> {
+                if(managerStoryteller != 0L && !event.member!!.hasPermission(Permission.MANAGE_ROLES)){
+                    event.reply("You cannot claim to be the storyteller as it is currently claimed by <@${managerStoryteller}>. Please ask them to release the role.").queue()
                 }
-            }
-            if(event.getOption("user") == null) {
-                event.reply("You have taken control as the primary storyteller").queue()
-                event.guild!!.addRoleToMember(event.member!!, storytellerRole).queue()
-                BotMain.managerStoryteller = event.member!!.idLong
-                event.guild!!.modifyNickname(event.member!!, "[GM] ${event.member!!.effectiveName}").queue()
-            }
-            else{
-                event.reply("You have made ${event.getOption("user")!!.asMember!!.effectiveName} the primary storyteller").queue()
-                event.guild!!.addRoleToMember(event.getOption("user")!!.asMember!!, storytellerRole).queue()
-                BotMain.managerStoryteller = event.getOption("user")!!.asMember!!.idLong
-                event.guild!!.modifyNickname(event.getOption("user")!!.asMember!!, "[GM] ${event.getOption("user")!!.asMember!!.effectiveName}").queue()
-            }
-        }
-        else if(event.member!!.roles.contains(storytellerRole) && event.member!!.idLong == BotMain.managerStoryteller)
-        {
-            val mentionedUser = event.getOption("user")!!.asMember
-            if(mentionedUser != null)
-            {
-                if(mentionedUser.roles.contains(storytellerRole)){
-                    BotMain.managerStoryteller = mentionedUser.idLong
-                    event.reply("You have made ${mentionedUser.effectiveName} the primary storyteller").queue()
-                    event.guild!!.modifyNickname(mentionedUser, "[GM] ${mentionedUser.effectiveName}").queue()
-                    for(member in event.guild!!.getMembersWithRoles(storytellerRole))
-                    {
-                        if(member.idLong != mentionedUser.idLong)
-                        {
-                            event.guild!!.removeRoleFromMember(member, storytellerRole).queue()
-                        }
+                else{
+                    val storytellerRole = event.guild!!.getRolesByName("Storyteller", true).first()
+                    val membersWithRole = event.guild!!.getMembersWithRoles(storytellerRole)
+                    for(member in membersWithRole){
+                        event.guild!!.removeRoleFromMember(member, storytellerRole).queue()
                     }
-                }
-                else {
-                    event.guild!!.addRoleToMember(mentionedUser, storytellerRole).queue()
-                    event.guild!!.modifyNickname(mentionedUser, "[Helper] ${event.getOption("user")!!.asMember!!.effectiveName}").queue()
-                    event.reply("You have added ${mentionedUser.effectiveName} as a co-host").queue()
+                    if(event.member!!.idLong != event.guild!!.ownerIdLong) {
+                        event.member!!.modifyNickname("(ST) " + event.member!!.effectiveName).complete()
+                        event.guild!!.addRoleToMember(event.member!!, storytellerRole).queue()
+                    }
+                    event.reply("You are now the storyteller").queue()
                 }
             }
-            else{
-                event.reply("You must specify someone to use this command on").queue()
+            "release" -> {
+                if(event.member!!.idLong == managerStoryteller || event.member!!.hasPermission(Permission.MANAGE_ROLES)){
+                    managerStoryteller = 0L
+                    event.reply("You are no longer the storyteller").queue()
+                }
+                if(event.member!!.hasPermission(Permission.MANAGE_ROLES)){
+                    managerStoryteller = 0L
+                    event.reply("The storyteller role has been released").queue()
+                }
+            }
+            "promote" -> {
+                if(event.member!!.idLong == managerStoryteller){
+                    val storytellerRole = event.guild!!.getRolesByName("Storyteller", true).first()
+                    event.guild!!.addRoleToMember(event.getOption("cohost")!!.asMember!!, storytellerRole).queue()
+                    event.reply("You have added <@${event.getOption("cohost")!!.asMember!!.idLong}>").queue()
+                }
+                else{
+                    event.reply("You are not the storyteller!").queue()
+                }
+            }
+            "set_grim" -> {
+                val storytellerRole = event.guild!!.getRolesByName("Storyteller", true).first()
+                val membersWithRole = event.guild!!.getMembersWithRoles(storytellerRole)
+                if(membersWithRole.contains(event.member)){
+                    BotMain.grimLink = event.getOption("grim")!!.asString
+                    event.reply("Link has been set").queue()
+                    return
+                }
+                event.reply("You are not the storyteller!").queue()
+            }
+            "announce" -> {
+                val storytellerRole = event.guild!!.getRolesByName("Storyteller", true).first()
+                val membersWithRole = event.guild!!.getMembersWithRoles(storytellerRole)
+                if(membersWithRole.contains(event.member)){
+                    event.channel.sendMessage(event.getOption("message")!!.asString).queue()
+                    return
+                }
+                event.reply("You are not the storyteller!").queue()
             }
         }
     }
+
+    fun handleCottage(event: SlashCommandInteractionEvent){
+        when(event.subcommandName){
+            "send" -> moveToNight(event)
+            "retrieve" -> moveToDay(event)
+        }
+    }
+
 }
 
 

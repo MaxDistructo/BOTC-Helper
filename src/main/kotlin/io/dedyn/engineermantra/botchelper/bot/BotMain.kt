@@ -6,14 +6,15 @@ import net.dv8tion.jda.api.Permission
 import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions
 import net.dv8tion.jda.api.interactions.commands.OptionType
 import net.dv8tion.jda.api.interactions.commands.build.Commands
+import net.dv8tion.jda.api.interactions.commands.build.SubcommandData
 
 object BotMain {
-    val imageProcessing: Boolean = false
     val bot_name = "BOTCHelper"
     lateinit var jda: JDA
     lateinit var logger: Logger
-    val voiceCache = mutableMapOf<Long, Long>()
     var managerStoryteller: Long = 0L
+    val spectatorMap = mutableMapOf<Long,Long>()
+    var grimLink = ""
 
     fun run()
     {
@@ -22,35 +23,56 @@ object BotMain {
         //Parse the known commands that we have and register any new ones but not do the old
         val commandNames = mutableListOf<String>()
         val commands = jda.retrieveCommands().complete()
-        if(!commandNames.contains("give_all_role")) {
+        commands.stream().forEach { command -> commandNames.add(command.name) }
+        for(command in commands){
+            if(command.name == "storyteller"){
+                command.delete().complete()
+            }
+        }
+        if(!commandNames.contains("cottage"))
+        {
             jda.upsertCommand(
-                Commands.slash("give_all_role", "Give all members a role")
-                    .setGuildOnly(true)
-                    .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_ROLES))
-                    .addOption(OptionType.ROLE, "role", "The role to give", true, false)
-                    .addOption(OptionType.ROLE, "role2", "1st restriction", false, false)
-                    .addOption(OptionType.ROLE, "role3", "2nd restriction", false, false)
-                    .addOption(OptionType.ROLE, "role4", "3rd restriction", false, false)
-                    .addOption(OptionType.ROLE, "role5", "4th restriction", false, false)
-                    .addOption(
-                        OptionType.BOOLEAN,
-                        "test",
-                        "Enable test mode to calculate without actually doing the role add",
-                        false,
-                        false
+                Commands.slash("cottage", "Bring members to and from a channel")
+                .setGuildOnly(true)
+                .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_ROLES))
+                    .addSubcommands(
+                        SubcommandData("send", "Send all active players to the cottages"),
+                        SubcommandData("retrieve", "Retrieve all active players from the cottages")
                     )
             ).complete()
         }
-        jda.getGuildById(1165357291629989979)!!.upsertCommand(
-            Commands.slash("goodnight", "Sends members to SLEEP")
-                .setDefaultPermissions(DefaultMemberPermissions.DISABLED)
+        if(!commandNames.contains("storyteller"))
+        {
+            jda.upsertCommand(
+                Commands.slash("storyteller", "Manage the current storyteller")
                 .setGuildOnly(true)
-        ).complete()
-        jda.getGuildById(1165357291629989979)!!.upsertCommand(
-            Commands.slash("goodmorning", "Wakes everyone up")
-                .setDefaultPermissions(DefaultMemberPermissions.DISABLED)
+                    .addSubcommands(
+                        SubcommandData("claim", "Claim the storyteller role if one is not in existence"),
+                        SubcommandData("release", "Stop being a storyteller (host or co-host)"),
+                        SubcommandData("promote", "Promote a player to be a co-host")
+                            .addOption(OptionType.USER, "cohost", "The player to be co-host", true),
+                        SubcommandData("set_grim", "Set the URL to the current grim")
+                            .addOption(OptionType.STRING, "grim", "The grim link", true),
+                        SubcommandData("announce", "Announce a message to the town")
+                            .addOption(OptionType.STRING, "message", "The message to announce", true)
+                    )
+            ).complete()
+        }
+        if(!commandNames.contains("grim"))
+        {
+            jda.upsertCommand(
+                Commands.slash("grim", "Get the current grim link")
                 .setGuildOnly(true)
-        ).complete()
+            ).complete()
+        }
+        if(!commandNames.contains("spec"))
+        {
+            jda.upsertCommand(
+                Commands.slash("spec", "Mark yourself as a spectator. If a user is provided, you will follow them around")
+                    .setGuildOnly(true)
+                    .addOption(OptionType.USER, "user", "The user that you will be spectating", false)
+            ).complete()
+        }
         jda.getGuildById(1165357291629989979)!!.upsertCommand(
             Commands.slash("summon", "Summon all VC members")
                 .setDefaultPermissions(DefaultMemberPermissions.DISABLED)

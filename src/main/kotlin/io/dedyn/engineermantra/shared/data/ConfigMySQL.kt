@@ -1,6 +1,5 @@
 package io.dedyn.engineermantra.shared.data
 
-import io.dedyn.engineermantra.omega.bot.BotMain
 import java.sql.Connection
 import java.sql.DriverManager
 
@@ -277,7 +276,6 @@ object ConfigMySQL: ConfigFileInterface {
         }
     }
     fun updateLevelingPoints(obj: DatabaseObject.Leveling) {
-        BotMain.logger.info("textPoints: ${obj.textPoints}, voicePoints: ${obj.voicePoints}")
         if (assertIsConnected()) {
             if (getLevelingPoints(obj.userId, obj.serverId) == null) {
                 connection.createStatement()
