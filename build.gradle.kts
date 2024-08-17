@@ -59,7 +59,7 @@ tasks.withType<KotlinCompile> {
 
 tasks {
     jar {
-        manifest.attributes["Main-Class"] = "io.dedyn.engineermantra.omega.Main"
+        manifest.attributes["Main-Class"] = "io.dedyn.engineermantra.botchelper.Main"
     }
     "build" {
         dependsOn(fatJar)
