@@ -4,7 +4,7 @@ WORKDIR /app
 RUN gradle jar
 RUN cp /app/build/libs/app.jar /app.jar
 
-FROM ghcr.io/graalvm/jdk-community:21
+FROM ghcr.io/graalvm/jdk-community:22
 #RUN echo "1.1" > version
 COPY --from=builder /app.jar /opt/app/BOTC-Helper.jar
 CMD java -jar /opt/app/BOTC-Helper.jar
