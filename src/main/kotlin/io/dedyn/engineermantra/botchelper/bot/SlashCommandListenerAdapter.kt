@@ -6,8 +6,10 @@ import net.dv8tion.jda.api.entities.*
 import net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel
 import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import net.dv8tion.jda.api.hooks.ListenerAdapter
 import net.dv8tion.jda.api.interactions.commands.Command
+import kotlin.io.path.Path
 
 
 class SlashCommandListenerAdapter: ListenerAdapter() {
@@ -27,13 +29,27 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
         }
     }
 
-    override fun onCommandAutoCompleteInteraction(event: CommandAutoCompleteInteractionEvent) {
-        when(event.focusedOption.name)
-        {
-            "permission" -> event.replyChoices(choices(event.focusedOption.value, "permissions")).queue()
-            "strike_type" -> event.replyChoices(choices(event.focusedOption.value, "strike_type")).queue()
-            "game" -> event.replyChoices(choices(event.focusedOption.value, "game")).queue()
-            else -> println("Autocomplete not found. Please check your command configuration. Missing: ${event.focusedOption.name}")
+    enum class Position{
+        PREFIX,
+        POSTFIX
+    }
+
+    //Oldschool message parsing!!!! YAYYYYY /s
+    override fun onMessageReceived(event: MessageReceivedEvent){
+        if(event.message.contentRaw.startsWith("*")){
+            var splitMsg = event.message.contentRaw.split(" ");
+            when(splitMsg[0]){
+                "*spec" -> spectateMember(event)
+                "*!" -> spectateMember(event)
+                "*st" -> nicknameMember(event.member, "ST", Position.PREFIX)
+                "*co-st" -> nicknameMember(event.member, "Co-ST", Position.PREFIX)
+                "*brb" -> nicknameMember(event.member, "BRB", Position.POSTFIX)
+                "*afk" -> nicknameMember(event.member, "AFK", Position.POSTFIX)
+                "*count" -> countPlayers(event)
+            }
+        }
+        if(event.message.contentRaw.lowercase().contains(" thanks") || event.message.contentRaw.lowercase().contains(" ty ") || event.message.contentRaw.lowercase().contains("thank you")){
+            //TODO: Implement thanks feature. Needs DB of some kind
         }
     }
 
@@ -123,6 +139,21 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
         }
     }
 
+    fun spectateMember(event: MessageReceivedEvent){
+        if(!event.member!!.effectiveName.startsWith('!')){
+            event.member!!.modifyNickname("!" + event.member!!.effectiveName).complete()
+            event.channel.sendMessage("You have been marked as a spectator").complete()
+        }
+        var optionalUser: Member? = null
+        if(event.message.mentions.membersBag.count() == 1) {
+            optionalUser = event.message.mentions.membersBag.first()
+        }
+        if(optionalUser != null){
+            BotMain.spectatorMap[event.member!!.idLong] = optionalUser.idLong
+            event.channel.sendMessage("You are now spectating ${optionalUser.asMention}").complete()
+        }
+    }
+
     fun spectateMember(event: SlashCommandInteractionEvent){
         if(!event.member!!.effectiveName.startsWith('!')){
             event.member!!.modifyNickname("!" + event.member!!.effectiveName).complete()
@@ -209,6 +240,20 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
             "send" -> moveToNight(event)
             "retrieve" -> moveToDay(event)
         }
+    }
+
+    fun nicknameMember(member: Member?, addition: String, position: Position){
+        if(member == null) return
+        if(position == Position.PREFIX){
+            member.modifyNickname("($addition) ${member.nickname}").queue()
+        }
+        else if(position == Position.POSTFIX){
+            member.modifyNickname("${member.nickname} [$addition]").queue()
+        }
+    }
+
+    fun countPlayers(event: MessageReceivedEvent){
+
     }
 
 }
