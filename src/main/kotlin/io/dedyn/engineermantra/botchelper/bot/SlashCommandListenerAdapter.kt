@@ -53,23 +53,6 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
         }
     }
 
-    //This is part of the AutoComplete code
-    fun choices(partial_word: String, autocompleteName: String): List<Command.Choice>
-    {
-        var words: List<String>
-        val type = listOf("Server", "Event", "Soundboard")
-        val games = listOf("Town of Salem 2", "Town of Salem", "Minecraft", "Steam", "VR Chat", "Blizzard", "Epic")
-
-        when(autocompleteName){
-            "strike_type" -> words = type
-            "game" -> words = games
-            else -> words = listOf()
-        }
-        val outputList = mutableListOf<Command.Choice>()
-        words.forEach{word -> if(word.startsWith(partial_word)) {outputList.add(Command.Choice(word, word))}}
-        return outputList
-    }
-
     /**
      * Blood on the Clocktower Server commands
      * These are NOT enabled in most servers.
@@ -253,7 +236,30 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
     }
 
     fun countPlayers(event: MessageReceivedEvent){
-
+        for(vc in event.guild.voiceChannels){
+            if(vc.members.contains(event.member)) {
+                var members = vc.members.dropWhile{!(it.effectiveName.startsWith("!") || it.effectiveName.startsWith("(ST)") || it.effectiveName.startsWith("(Co-ST)"))}
+                if(members.count() < 5){
+                    event.channel.sendMessage("There is not enough members for a game")
+                }
+                var demonCount = 1
+                var minionCount = 1
+                var outsiderCount = 0
+                var townsfolkCount = 3
+                while(demonCount + minionCount + outsiderCount + townsfolkCount < members.count()){
+                    if(outsiderCount == 2){
+                        minionCount++
+                        outsiderCount = 0
+                        townsfolkCount++
+                    }
+                    else{
+                        outsiderCount++
+                    }
+                }
+                event.channel.sendMessage("*>> The current composition of ${members.count()} players should typically be:*\n - $townsfolkCount Townsfolk\n - $outsiderCount Outsider(s) \n - $minionCount Minion(s)\n - 1 Demon").queue()
+                break
+            }
+        }
     }
 
 }
