@@ -35,9 +35,12 @@ dependencies {
     //implementation(group = "com.github.discord-jda", name = "JDA", version = "79b1b560b1")
     implementation(group = "net.dv8tion", name = "JDA", version = "5.0.1")
     implementation(group = "club.minnced", name = "discord-webhooks", version = "0.8.4")
-    implementation(group = "org.mariadb.jdbc", name = "mariadb-java-client", version = "3.4.1")
+    //implementation(group = "org.mariadb.jdbc", name = "mariadb-java-client", version = "3.4.1")
     implementation(group = "net.java.dev.jna", name = "jna", version = "5.14.0")
     implementation(group = "net.java.dev.jna", name = "jna-platform", version = "5.14.0")
+    //Instead of using Maria/MySQL, use a CassandraDB which is a NoSQL implementation.
+    //This better represents the data we wish to store
+    implementation("org.apache.cassandra:java-driver-core:4.18.1")
 }
 
 sourceSets {
