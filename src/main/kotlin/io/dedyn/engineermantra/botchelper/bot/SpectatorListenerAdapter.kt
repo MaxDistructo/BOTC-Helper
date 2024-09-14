@@ -11,15 +11,14 @@ class SpectatorListenerAdapter: ListenerAdapter() {
         //Moved between VCs
         if(event.channelJoined != null && event.channelLeft != null)
         {
-            if(BotMain.spectatorMap.containsKey(event.member.idLong)){
-                for(vc in event.guild.voiceChannels)
-                {
-                    if(vc.members.any{m -> m.idLong == BotMain.spectatorMap[event.member.idLong]})
-                    {
-                        event.guild.moveVoiceMember(event.member, vc)
-                        return
-                    }
-                }
+            println("${event.member.effectiveName} left ${event.channelLeft!!.name} and joined ${event.channelJoined!!.name}")
+            if(BotMain.spectatorMap.containsKey(event.member.idLong) && !BotMain.spectatorMap[event.member.idLong].isNullOrEmpty()){
+               for(follower in BotMain.spectatorMap[event.member.idLong]!!){
+                   val followerMember = event.guild.getMemberById(follower)
+                   if (followerMember != null && follower != event.member.idLong) {
+                       event.guild.moveVoiceMember(followerMember, event.channelJoined).queue()
+                   }
+               }
             }
             //Ignore this case for now, we just need to catch it at the start to not mistake this as a DC.
             return

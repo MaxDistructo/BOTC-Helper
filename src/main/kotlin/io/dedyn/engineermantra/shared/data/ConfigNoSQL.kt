@@ -22,7 +22,7 @@ object ConfigNoSQL: ConfigFileInterface {
 
     override fun get(token: String): String? {
         session?.execute("SELECT $token FROM thanks")
-        
+        return ""
     }
 
     override fun set(token: String, value: String) {

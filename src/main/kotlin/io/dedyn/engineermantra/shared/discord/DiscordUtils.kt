@@ -4,11 +4,13 @@ import io.dedyn.engineermantra.shared.data.ConfigMySQL
 import io.dedyn.engineermantra.shared.MessageLevel
 import io.dedyn.engineermantra.shared.Utils
 import net.dv8tion.jda.api.EmbedBuilder
+import net.dv8tion.jda.api.JDA
 import net.dv8tion.jda.api.Permission
 import net.dv8tion.jda.api.entities.*
 import net.dv8tion.jda.api.entities.channel.Channel
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel
 import java.time.Instant
+import kotlin.math.min
 
 object DiscordUtils {
     fun channelHasPermission(channel: GuildChannel, permission: Permission): Boolean
@@ -145,6 +147,77 @@ object DiscordUtils {
             return true
         }
         return false
+    }
+
+    fun jaroWinklerSimilarity(s1: String, s2: String): Double {
+        val s1Len = s1.length
+        val s2Len = s2.length
+
+        if (s1Len == 0 && s2Len == 0) return 1.0
+        if (s1Len == 0 || s2Len == 0) return 0.0
+
+        val matchDistance = (min(s1Len, s2Len) / 2) - 1
+
+        val s1Matches = BooleanArray(s1Len)
+        val s2Matches = BooleanArray(s2Len)
+
+        var matches = 0
+        var transpositions = 0
+        // Find matches
+        for (i in s1.indices) {
+            val start = maxOf(0, i - matchDistance)
+            val end = min(i + matchDistance + 1, s2Len)
+
+            for (j in start until end) {
+                if (!s2Matches[j] && s1[i] == s2[j]) {
+                    s1Matches[i] = true
+                    s2Matches[j] = true
+                    matches++
+                    break
+                }
+            }
+        }
+        if (matches == 0) return 0.0
+        // Find transpositions
+        var k = 0
+        for (i in s1.indices) {
+            if (s1Matches[i]) {
+                while (!s2Matches[k]) k++
+                if (s1[i] != s2[k]) transpositions++
+                k++
+            }
+        }
+        transpositions /= 2
+        // Jaro similarity
+        val jaro = ((matches.toDouble() / s1Len) +
+                (matches.toDouble() / s2Len) +
+                ((matches - transpositions).toDouble() / matches)) / 3.0
+        // Jaro-Winkler adjustment
+        val prefixLength = min(4, s1.commonPrefixWith(s2).length)
+        val p = 0.1 // scaling factor
+        return jaro + (prefixLength * p * (1 - jaro))
+    }
+
+    fun Message.getMentionedUser(): Member?{
+        if(mentions.members.size >= 1){
+            return mentions.members[0]
+        }
+        var splitStr = contentRaw.split(' ')
+        for(word in splitStr){
+            var partialMatch: Member? = null
+            var partialMatchPercent = 0.0
+            for(vc in guild.voiceChannels){
+                for(member in vc.members){
+                    val matchPercent = jaroWinklerSimilarity(member.effectiveName, word)
+                    if(matchPercent > partialMatchPercent){
+                        partialMatchPercent = matchPercent
+                        partialMatch = member
+                    }
+                }
+            }
+            return partialMatch
+        }
+        return null
     }
 
     /* TODO: Rewrite as extensions on JDA object

@@ -13,13 +13,14 @@ object BotMain {
     lateinit var jda: JDA
     lateinit var logger: Logger
     var managerStoryteller: Long = 0L
-    val spectatorMap = mutableMapOf<Long,Long>()
+    val spectatorMap = mutableMapOf<Long,MutableList<Long>>()
     var grimLink = ""
 
     fun run()
     {
         logger.info("Adding slash commands")
         jda.addEventListener(SlashCommandListenerAdapter())
+        jda.addEventListener(SpectatorListenerAdapter())
         //Parse the known commands that we have and register any new ones but not do the old
         val commandNames = mutableListOf<String>()
         val commands = jda.retrieveCommands().complete()
@@ -71,6 +72,13 @@ object BotMain {
                 Commands.slash("spec", "Mark yourself as a spectator. If a user is provided, you will follow them around")
                     .setGuildOnly(true)
                     .addOption(OptionType.USER, "user", "The user that you will be spectating", false)
+            ).complete()
+        }
+        if(!commandNames.contains("delete_history")){
+            jda.upsertCommand(
+                Commands.slash("delete_history", "Add this channel to have it's history deleted")
+                .setGuildOnly(true)
+                .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_CHANNEL))
             ).complete()
         }
         jda.getGuildById(1165357291629989979)!!.upsertCommand(

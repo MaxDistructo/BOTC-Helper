@@ -1,18 +1,21 @@
 package io.dedyn.engineermantra.botchelper.bot
 
+import ch.qos.logback.core.net.QueueFactory
 import io.dedyn.engineermantra.botchelper.bot.BotMain.managerStoryteller
+import io.dedyn.engineermantra.shared.discord.DiscordUtils.getMentionedUser
 import net.dv8tion.jda.api.Permission
 import net.dv8tion.jda.api.entities.*
 import net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel
-import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
+import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent
 import net.dv8tion.jda.api.hooks.ListenerAdapter
-import net.dv8tion.jda.api.interactions.commands.Command
-import kotlin.io.path.Path
-
+import net.dv8tion.jda.api.utils.messages.MessagePollData
+import java.time.Duration
 
 class SlashCommandListenerAdapter: ListenerAdapter() {
+    var grimLink: MutableMap<Long, String> = mutableMapOf()
+    var stQueue: MutableList<Member> = mutableListOf()
     override fun onSlashCommandInteraction(event: SlashCommandInteractionEvent) {
         val time = System.currentTimeMillis()
         when(event.name){
@@ -25,6 +28,7 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
             "grim" -> handleGrim(event)
             "storyteller" -> handleStoryteller(event)
             "cottage" -> handleCottage(event)
+            "queue" -> handleQueue(event)
             else -> println("Command not found ${event.name}")
         }
     }
@@ -38,14 +42,20 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
     override fun onMessageReceived(event: MessageReceivedEvent){
         if(event.message.contentRaw.startsWith("*")){
             var splitMsg = event.message.contentRaw.split(" ");
-            when(splitMsg[0]){
+            when(splitMsg[0].lowercase()){
                 "*spec" -> spectateMember(event)
+                "*unspec" -> unspectate(event)
                 "*!" -> spectateMember(event)
-                "*st" -> nicknameMember(event.member, "ST", Position.PREFIX)
-                "*co-st" -> nicknameMember(event.member, "Co-ST", Position.PREFIX)
-                "*brb" -> nicknameMember(event.member, "BRB", Position.POSTFIX)
-                "*afk" -> nicknameMember(event.member, "AFK", Position.POSTFIX)
+                "*st" -> nicknameMember(event.member, "ST", Position.PREFIX, true)
+                "*co-st" -> nicknameMember(event.member, "Co-ST", Position.PREFIX, true)
+                "*brb" -> nicknameMember(event.member, "BRB", Position.POSTFIX, false)
+                "*afk" -> nicknameMember(event.member, "AFK", Position.POSTFIX, false)
                 "*count" -> countPlayers(event)
+                "*t" -> nicknameMember(event.member, "T", Position.PREFIX, true)
+                "*grim" -> grimCommand(event)
+                "*poll" -> createPoll(event, false)
+                "*pollc" -> createPoll(event, true)
+                "*n" -> nicknameMember(event.member, "N", Position.POSTFIX, false)
             }
         }
         if(event.message.contentRaw.lowercase().contains(" thanks") || event.message.contentRaw.lowercase().contains(" ty ") || event.message.contentRaw.lowercase().contains("thank you")){
@@ -123,17 +133,40 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
     }
 
     fun spectateMember(event: MessageReceivedEvent){
-        if(!event.member!!.effectiveName.startsWith('!')){
-            event.member!!.modifyNickname("!" + event.member!!.effectiveName).complete()
-            event.channel.sendMessage("You have been marked as a spectator").complete()
+        val splitMessage = event.message.contentRaw.split(" ")
+        if(splitMessage.size == 1){
+            if(!event.member!!.effectiveName.startsWith('!')){
+                var memberName = event.member!!.effectiveName
+                for(prefix in knownPrefixes){
+                    if(memberName.startsWith(prefix)){
+                        memberName = memberName.removePrefix(prefix)
+                    }
+                }
+                event.member!!.modifyNickname("!$memberName").queue()
+            }
+            else{
+                event.member!!.modifyNickname( event.member!!.effectiveName.substring(1)).complete()
+                for(value in BotMain.spectatorMap){
+                    if(value.value.contains(event.member!!.idLong)){
+                        BotMain.spectatorMap[value.key]!!.remove(event.member!!.idLong)
+                    }
+                }
+            }
         }
-        var optionalUser: Member? = null
-        if(event.message.mentions.membersBag.count() == 1) {
-            optionalUser = event.message.mentions.membersBag.first()
-        }
-        if(optionalUser != null){
-            BotMain.spectatorMap[event.member!!.idLong] = optionalUser.idLong
-            event.channel.sendMessage("You are now spectating ${optionalUser.asMention}").complete()
+        else{
+            val optionalUser: Member? = event.message.getMentionedUser()
+            if(optionalUser != null){
+                if(BotMain.spectatorMap[optionalUser.idLong].isNullOrEmpty()){
+                    BotMain.spectatorMap[optionalUser.idLong] = mutableListOf()
+                }
+                //Previous check enforces this is not null
+                BotMain.spectatorMap[optionalUser.idLong]!!.add(event.member!!.idLong)
+                event.channel.sendMessage("You are now spectating ${optionalUser.asMention}").queue()
+                println(BotMain.spectatorMap)
+            }
+            else{
+                event.channel.sendMessage("I cannot find the user you have mentioned!").queue()
+            }
         }
     }
 
@@ -143,7 +176,7 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
             event.reply("You have been marked as a spectator").complete()
         }
         if(event.getOption("user") != null){
-            BotMain.spectatorMap[event.member!!.idLong] = event.getOption("user")!!.asMember!!.idLong
+            //BotMain.spectatorMap[event.member!!.idLong] = event.getOption("user")!!.asMember!!.idLong
             event.reply("You are now spectating ${event.getOption("user")!!.asMember!!.asMention}").complete()
         }
     }
@@ -225,41 +258,146 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
         }
     }
 
-    fun nicknameMember(member: Member?, addition: String, position: Position){
+    val knownPrefixes: List<String> = listOf("!", "(ST) ", "(Co-ST) ", "(T) ")
+    val knownSuffixes: List<String> = listOf(" [BRB]", " [AFK]")
+
+    fun nicknameMember(member: Member?, addition: String, position: Position, removeOld: Boolean){
         if(member == null) return
+        var memberName = member.effectiveName;
+        if(removeOld && position == Position.PREFIX){
+            for(prefix in knownPrefixes){
+                if(memberName.startsWith(prefix)){
+                    memberName = memberName.removePrefix(prefix)
+                }
+            }
+        }
+        if(removeOld && position == Position.POSTFIX){
+            for(prefix in knownSuffixes) {
+                if (memberName.endsWith(prefix)) {
+                    memberName = memberName.removeSuffix(prefix)
+                }
+            }
+        }
         if(position == Position.PREFIX){
-            member.modifyNickname("($addition) ${member.nickname}").queue()
+            member.modifyNickname("($addition) $memberName").queue()
         }
         else if(position == Position.POSTFIX){
-            member.modifyNickname("${member.nickname} [$addition]").queue()
+            member.modifyNickname("$memberName [$addition]").queue()
         }
     }
 
     fun countPlayers(event: MessageReceivedEvent){
         for(vc in event.guild.voiceChannels){
             if(vc.members.contains(event.member)) {
-                var members = vc.members.dropWhile{!(it.effectiveName.startsWith("!") || it.effectiveName.startsWith("(ST)") || it.effectiveName.startsWith("(Co-ST)"))}
-                if(members.count() < 5){
-                    event.channel.sendMessage("There is not enough members for a game")
+                val members = mutableListOf<Member>();
+                var travelerCount = 0
+                for(member in vc.members){
+                    if(!member.effectiveName.startsWith("!") && !member.effectiveName.startsWith("(Co-ST)") && !member.effectiveName.startsWith("(ST)") && !member.effectiveName.startsWith("(T)")){
+                        members.add(member)
+                    }
+                    if(member.effectiveName.startsWith("(T)")) {
+                        travelerCount++
+                    }
                 }
-                var demonCount = 1
-                var minionCount = 1
+                if(members.count() < 5){
+                    event.channel.sendMessage("There is not enough members for a game").queue()
+                    return
+                }
+                var minionCount = 0
                 var outsiderCount = 0
                 var townsfolkCount = 3
-                while(demonCount + minionCount + outsiderCount + townsfolkCount < members.count()){
+                while(1 + minionCount + outsiderCount + townsfolkCount < members.count()){
                     if(outsiderCount == 2){
                         minionCount++
                         outsiderCount = 0
-                        townsfolkCount++
+                        townsfolkCount += 2
                     }
                     else{
                         outsiderCount++
                     }
                 }
-                event.channel.sendMessage("*>> The current composition of ${members.count()} players should typically be:*\n - $townsfolkCount Townsfolk\n - $outsiderCount Outsider(s) \n - $minionCount Minion(s)\n - 1 Demon").queue()
+                event.channel.sendMessage("*>> The current composition of ${members.count() + travelerCount} players should typically be:*\n- $townsfolkCount Townsfolk\n- $outsiderCount Outsider(s)\n- $minionCount Minion(s)\n- 1 Demon\n- $travelerCount Travelers").queue()
                 break
             }
         }
+    }
+
+    fun grimCommand(event: MessageReceivedEvent){
+        val splitMessage = event.message.contentRaw.split(' ')
+        if(splitMessage.size == 2){
+            //Check if they are ST
+            if(event.member!!.effectiveName.startsWith("(ST)")){
+                grimLink[event.member!!.idLong] = splitMessage[1]
+            }
+        }
+        else{
+            for(st in grimLink.keys){
+                if(grimLink[st] != null && grimLink[st] != ""){
+                    event.channel.sendMessage("Current Grim: ${grimLink[st]!!}").queue()
+                    return
+                }
+            }
+            event.channel.sendMessage("Grim has not been provided").queue()
+        }
+    }
+
+    fun unspectate(event: MessageReceivedEvent){
+        if(event.message.contentRaw.split(" ").size == 2) {
+            val optionalUser: Member? = event.message.getMentionedUser()
+            if (optionalUser != null) {
+                if (BotMain.spectatorMap[optionalUser.idLong].isNullOrEmpty()) {
+                    BotMain.spectatorMap[optionalUser.idLong] = mutableListOf()
+                }
+                //Previous check enforces this is not null
+                BotMain.spectatorMap[optionalUser.idLong]!!.remove(event.member!!.idLong)
+                event.channel.sendMessage("You are no longer spectating spectating ${optionalUser.effectiveName}").queue()
+            } else {
+                event.channel.sendMessage("I cannot find the user you have mentioned!").queue()
+            }
+        }
+        else{
+            for(value in BotMain.spectatorMap){
+                if(value.value.contains(event.member!!.idLong)){
+                    BotMain.spectatorMap[value.key]!!.remove(event.member!!.idLong)
+                }
+            }
+            event.channel.sendMessage("You are no longer spectating anyone").queue()
+        }
+    }
+
+    fun handleQueue(event: SlashCommandInteractionEvent){
+        
+    }
+
+    override fun onMessageReactionAdd(event: MessageReactionAddEvent) {
+        if(!event.isFromGuild) return
+        val message = event.retrieveMessage().complete()
+        if(message.contentRaw == "*consult" && event.member!!.effectiveName.startsWith("(ST)")){
+            for(vc in event.guild.voiceChannels){
+                if(vc.members.contains(message.member) && vc.parentCategoryId == "1165358625674510357"){
+                    val stPrivate = event.guild.getVoiceChannelById(1165358638664269986)
+                    event.guild.moveVoiceMember(event.member!!, stPrivate).queue()
+                    event.guild.moveVoiceMember(message.member!!, stPrivate).queue()
+                }
+                else if(vc.members.contains(event.member)){
+                    event.guild.moveVoiceMember(message.member!!, vc).queue()
+                }
+            }
+        }
+    }
+
+    fun createPoll(event: MessageReceivedEvent, addCustom: Boolean){
+        val pollData = MessagePollData.builder("Which Script?")
+            .addAnswer("Trouble Brewing (TB)")
+            .addAnswer("Bad Moon Rising (BMR)")
+            .addAnswer("Sects and Violets (S&V)")
+            .setDuration(Duration.ofHours(1))
+        if(addCustom){
+            pollData.addAnswer("Custom")
+        }
+            event.channel.sendMessage("ST Asks:")
+                .setPoll(pollData.build())
+                .queue()
     }
 
 }
