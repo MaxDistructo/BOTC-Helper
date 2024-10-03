@@ -199,25 +199,32 @@ object DiscordUtils {
     }
 
     fun Message.getMentionedUser(): Member?{
-        if(mentions.members.size >= 1){
+        if(mentions.members.isNotEmpty()){
             return mentions.members[0]
         }
         var splitStr = contentRaw.split(' ')
-        for(word in splitStr){
-            var partialMatch: Member? = null
-            var partialMatchPercent = 0.0
-            for(vc in guild.voiceChannels){
-                for(member in vc.members){
-                    val matchPercent = jaroWinklerSimilarity(member.effectiveName, word)
-                    if(matchPercent > partialMatchPercent){
-                        partialMatchPercent = matchPercent
-                        partialMatch = member
-                    }
+        var word = splitStr[1]
+        var partialMatch: Member? = null
+        var partialMatchPercent = 0.0
+        val potentialMembers = guild.getMembersByEffectiveName(word, true)
+        val potentialMembersFullName = guild.getMembersByName(word, true)
+        if(potentialMembersFullName.count() > 0){
+            return potentialMembersFullName[0]
+        }
+        if(potentialMembers.count() > 0){
+            return potentialMembers[0]
+        }
+        for(vc in guild.voiceChannels){
+            for(member in vc.members){
+                val matchPercent = jaroWinklerSimilarity(member.effectiveName, word)
+                println("Match Percentage: ${member.effectiveName}, $word - $matchPercent")
+                if(matchPercent > partialMatchPercent){
+                    partialMatchPercent = matchPercent
+                    partialMatch = member
                 }
             }
-            return partialMatch
         }
-        return null
+        return partialMatch
     }
 
     /* TODO: Rewrite as extensions on JDA object

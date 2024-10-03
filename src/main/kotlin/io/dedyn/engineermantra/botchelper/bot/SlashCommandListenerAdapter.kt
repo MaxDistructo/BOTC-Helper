@@ -5,7 +5,9 @@ import io.dedyn.engineermantra.botchelper.bot.BotMain.managerStoryteller
 import io.dedyn.engineermantra.shared.discord.DiscordUtils.getMentionedUser
 import net.dv8tion.jda.api.Permission
 import net.dv8tion.jda.api.entities.*
+import net.dv8tion.jda.api.entities.channel.concrete.Category
 import net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel
+import net.dv8tion.jda.api.events.guild.member.update.GuildMemberUpdateNicknameEvent
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent
@@ -28,7 +30,6 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
             "grim" -> handleGrim(event)
             "storyteller" -> handleStoryteller(event)
             "cottage" -> handleCottage(event)
-            "queue" -> handleQueue(event)
             else -> println("Command not found ${event.name}")
         }
     }
@@ -48,8 +49,9 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
                 "*!" -> spectateMember(event)
                 "*st" -> nicknameMember(event.member, "ST", Position.PREFIX, true)
                 "*co-st" -> nicknameMember(event.member, "Co-ST", Position.PREFIX, true)
-                "*brb" -> nicknameMember(event.member, "BRB", Position.POSTFIX, false)
-                "*afk" -> nicknameMember(event.member, "AFK", Position.POSTFIX, false)
+                "*cost" -> nicknameMember(event.member, "Co-ST", Position.PREFIX, true)
+                "*brb" -> nicknameMember(event.member, "BRB", Position.POSTFIX, true)
+                "*afk" -> nicknameMember(event.member, "AFK", Position.POSTFIX, true)
                 "*count" -> countPlayers(event)
                 "*t" -> nicknameMember(event.member, "T", Position.PREFIX, true)
                 "*grim" -> grimCommand(event)
@@ -58,8 +60,20 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
                 "*n" -> nicknameMember(event.member, "N", Position.POSTFIX, false)
             }
         }
-        if(event.message.contentRaw.lowercase().contains(" thanks") || event.message.contentRaw.lowercase().contains(" ty ") || event.message.contentRaw.lowercase().contains("thank you")){
-            //TODO: Implement thanks feature. Needs DB of some kind
+        if(event.isFromGuild && event.message.contentDisplay.contains("https://clocktower.live/#") || event.message.contentDisplay.contains("https://clocktower.online/#")){
+            if(event.message.member!!.effectiveName.startsWith("(ST)") || event.message.member!!.effectiveName.startsWith("(Co-ST)")) {
+                grimLink[event.message.author.idLong] = event.message.contentDisplay
+            }
+        }
+    }
+
+    override fun onGuildMemberUpdateNickname(event: GuildMemberUpdateNicknameEvent) {
+        if  (event.oldNickname != null &&
+            (event.oldNickname!!.startsWith("(ST)") || event.oldNickname!!.startsWith("(Co-ST)")) &&
+            event.newNickname != null &&
+            (!event.newNickname!!.startsWith("(ST)") && !event.newNickname!!.startsWith("(Co-ST)"))
+            ){
+            grimLink[event.member.idLong] = ""
         }
     }
 
@@ -264,62 +278,87 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
     fun nicknameMember(member: Member?, addition: String, position: Position, removeOld: Boolean){
         if(member == null) return
         var memberName = member.effectiveName;
+
+        //If removeOld is toggled on, default true)
         if(removeOld && position == Position.PREFIX){
+            //Loop over all prefixes
             for(prefix in knownPrefixes){
-                if(memberName.startsWith(prefix)){
+                //If the name of the player starts with the prefix and it is not what we want to add, remove the prefix
+                if(memberName.startsWith(prefix) && prefix != addition){
                     memberName = memberName.removePrefix(prefix)
                 }
             }
         }
         if(removeOld && position == Position.POSTFIX){
             for(prefix in knownSuffixes) {
-                if (memberName.endsWith(prefix)) {
+                if (memberName.endsWith(prefix) && prefix != addition) {
                     memberName = memberName.removeSuffix(prefix)
                 }
             }
         }
         if(position == Position.PREFIX){
-            member.modifyNickname("($addition) $memberName").queue()
+            //If the memberName starts with what we want to add, remove it
+            if(!member.effectiveName.startsWith("($addition) ")){
+                member.modifyNickname("($addition) $memberName").queue()
+            }
+            else{
+                member.modifyNickname(memberName).queue()
+            }
         }
         else if(position == Position.POSTFIX){
-            member.modifyNickname("$memberName [$addition]").queue()
+            if(!member.effectiveName.endsWith(" [$addition]")){
+                member.modifyNickname("$memberName [$addition]").queue()
+            }
+            else{
+                member.modifyNickname(memberName).queue()
+            }
         }
     }
 
     fun countPlayers(event: MessageReceivedEvent){
-        for(vc in event.guild.voiceChannels){
+        val channelMembers = mutableListOf<Member>()
+        var category: Category? = null
+        for(vc in event.guild.voiceChannels) {
             if(vc.members.contains(event.member)) {
-                val members = mutableListOf<Member>();
-                var travelerCount = 0
-                for(member in vc.members){
-                    if(!member.effectiveName.startsWith("!") && !member.effectiveName.startsWith("(Co-ST)") && !member.effectiveName.startsWith("(ST)") && !member.effectiveName.startsWith("(T)")){
-                        members.add(member)
-                    }
-                    if(member.effectiveName.startsWith("(T)")) {
-                        travelerCount++
-                    }
-                }
-                if(members.count() < 5){
-                    event.channel.sendMessage("There is not enough members for a game").queue()
-                    return
-                }
-                var minionCount = 0
-                var outsiderCount = 0
-                var townsfolkCount = 3
-                while(1 + minionCount + outsiderCount + townsfolkCount < members.count()){
-                    if(outsiderCount == 2){
-                        minionCount++
-                        outsiderCount = 0
-                        townsfolkCount += 2
-                    }
-                    else{
-                        outsiderCount++
-                    }
-                }
-                event.channel.sendMessage("*>> The current composition of ${members.count() + travelerCount} players should typically be:*\n- $townsfolkCount Townsfolk\n- $outsiderCount Outsider(s)\n- $minionCount Minion(s)\n- 1 Demon\n- $travelerCount Travelers").queue()
-                break
+                category = vc.parentCategory
             }
         }
+        if(category == null) {
+            return
+        }
+        for(channel in category.channels) {
+            if(channel is VoiceChannel) {
+                channelMembers.addAll(channel.members)
+            }
+        }
+        var travelerCount = 0
+        var members = mutableListOf<Member>();
+        for(member in channelMembers){
+            if(!member.effectiveName.startsWith("!") && !member.effectiveName.startsWith("(Co-ST)") && !member.effectiveName.startsWith("(ST)") && !member.effectiveName.startsWith("(T)")){
+                members.add(member)
+            }
+            if(member.effectiveName.startsWith("(T)")) {
+                travelerCount++
+            }
+        }
+        if(members.count() < 5){
+            event.channel.sendMessage("There is not enough members for a game").queue()
+            return
+        }
+        var minionCount = 0
+        var outsiderCount = 0
+        var townsfolkCount = 3
+        while(1 + minionCount + outsiderCount + townsfolkCount < members.count()){
+            if(outsiderCount == 2){
+                minionCount++
+                outsiderCount = 0
+                townsfolkCount += 2
+            }
+            else{
+                outsiderCount++
+            }
+        }
+        event.channel.sendMessage("*>> The current composition of ${members.count() + travelerCount} players should typically be:*\n- $townsfolkCount Townsfolk\n- $outsiderCount Outsider(s)\n- $minionCount Minion(s)\n- 1 Demon\n- $travelerCount Travelers").queue()
     }
 
     fun grimCommand(event: MessageReceivedEvent){
@@ -365,10 +404,6 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
         }
     }
 
-    fun handleQueue(event: SlashCommandInteractionEvent){
-        
-    }
-
     override fun onMessageReactionAdd(event: MessageReactionAddEvent) {
         if(!event.isFromGuild) return
         val message = event.retrieveMessage().complete()
@@ -378,9 +413,6 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
                     val stPrivate = event.guild.getVoiceChannelById(1165358638664269986)
                     event.guild.moveVoiceMember(event.member!!, stPrivate).queue()
                     event.guild.moveVoiceMember(message.member!!, stPrivate).queue()
-                }
-                else if(vc.members.contains(event.member)){
-                    event.guild.moveVoiceMember(message.member!!, vc).queue()
                 }
             }
         }
