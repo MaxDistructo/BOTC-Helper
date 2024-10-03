@@ -7,6 +7,7 @@ import net.dv8tion.jda.api.Permission
 import net.dv8tion.jda.api.entities.*
 import net.dv8tion.jda.api.entities.channel.concrete.Category
 import net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel
+import net.dv8tion.jda.api.entities.emoji.Emoji
 import net.dv8tion.jda.api.events.guild.member.update.GuildMemberUpdateNicknameEvent
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
@@ -58,6 +59,7 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
                 "*poll" -> createPoll(event, false)
                 "*pollc" -> createPoll(event, true)
                 "*n" -> nicknameMember(event.member, "N", Position.POSTFIX, false)
+                "*consult" -> event.message.addReaction(Emoji.fromUnicode("U+2714")).queue()
             }
         }
         if(event.isFromGuild && event.message.contentDisplay.contains("https://clocktower.live/#") || event.message.contentDisplay.contains("https://clocktower.online/#")){
@@ -67,13 +69,39 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
         }
     }
 
+    override fun onMessageReactionAdd(event: MessageReactionAddEvent) {
+        if(!event.isFromGuild) return
+        if(event.user!!.isBot) return
+        val message = event.retrieveMessage().complete()
+        if(message.contentRaw == "*consult" && event.member!!.effectiveName.startsWith("(ST)")){
+            for(vc in event.guild.voiceChannels){
+                if(vc.members.contains(message.member) && vc.parentCategoryId == "1165358625674510357"){
+                    val stPrivate = event.guild.getVoiceChannelById(1165358638664269986)
+                    event.guild.moveVoiceMember(event.member!!, stPrivate).queue()
+                    event.guild.moveVoiceMember(message.member!!, stPrivate).queue()
+                }
+            }
+        }
+    }
+
+
     override fun onGuildMemberUpdateNickname(event: GuildMemberUpdateNicknameEvent) {
-        if  (event.oldNickname != null &&
-            (event.oldNickname!!.startsWith("(ST)") || event.oldNickname!!.startsWith("(Co-ST)")) &&
-            event.newNickname != null &&
-            (!event.newNickname!!.startsWith("(ST)") && !event.newNickname!!.startsWith("(Co-ST)"))
-            ){
-            grimLink[event.member.idLong] = ""
+        if(event.oldNickname == null || event.newNickname == null) return
+        if ((event.oldNickname!!.startsWith("(ST)") && !event.newNickname!!.startsWith("(ST)")) ||
+            (event.oldNickname!!.startsWith("(Co-ST)") && !event.newNickname!!.startsWith("(Co-ST)")))
+            {
+                //Storyteller role
+                var role = event.guild.getRolesByName("Storyteller", true).firstOrNull()
+                if(role != null){
+                    event.guild.removeRoleFromMember(event.member, role)
+                }
+                grimLink[event.member.idLong] = ""
+            }
+        if(event.newNickname!!.startsWith("(ST)") || event.newNickname!!.startsWith("(Co-ST)")){
+            var role = event.guild.getRolesByName("Storyteller", true).firstOrNull()
+            if(role != null){
+                event.guild.addRoleToMember(event.member, role)
+            }
         }
     }
 
@@ -404,19 +432,6 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
         }
     }
 
-    override fun onMessageReactionAdd(event: MessageReactionAddEvent) {
-        if(!event.isFromGuild) return
-        val message = event.retrieveMessage().complete()
-        if(message.contentRaw == "*consult" && event.member!!.effectiveName.startsWith("(ST)")){
-            for(vc in event.guild.voiceChannels){
-                if(vc.members.contains(message.member) && vc.parentCategoryId == "1165358625674510357"){
-                    val stPrivate = event.guild.getVoiceChannelById(1165358638664269986)
-                    event.guild.moveVoiceMember(event.member!!, stPrivate).queue()
-                    event.guild.moveVoiceMember(message.member!!, stPrivate).queue()
-                }
-            }
-        }
-    }
 
     fun createPoll(event: MessageReceivedEvent, addCustom: Boolean){
         val pollData = MessagePollData.builder("Which Script?")
