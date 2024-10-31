@@ -301,7 +301,7 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
     }
 
     val knownPrefixes: List<String> = listOf("!", "(ST) ", "(Co-ST) ", "(T) ")
-    val knownSuffixes: List<String> = listOf(" [BRB]", " [AFK]")
+    val knownSuffixes: List<String> = listOf(" [BRB]", " [AFK]", " [N]")
 
     fun nicknameMember(member: Member?, addition: String, position: Position, removeOld: Boolean){
         if(member == null) return
@@ -320,7 +320,12 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
         if(removeOld && position == Position.POSTFIX){
             for(prefix in knownSuffixes) {
                 if (memberName.endsWith(prefix) && prefix != addition) {
-                    memberName = memberName.removeSuffix(prefix)
+                    if(prefix != "[N]" && memberName.endsWith("[N]")){
+                        //ignore new tag if we're not adding/removing the new tag
+                    }
+                    else{
+                        memberName = memberName.removeSuffix(prefix)
+                    }
                 }
             }
         }
