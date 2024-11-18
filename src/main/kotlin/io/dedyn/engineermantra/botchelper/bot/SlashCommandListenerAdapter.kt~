@@ -15,7 +15,6 @@ import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent
 import net.dv8tion.jda.api.hooks.ListenerAdapter
 import net.dv8tion.jda.api.utils.messages.MessagePollData
 import java.time.Duration
-import kotlin.random.Random
 
 class SlashCommandListenerAdapter: ListenerAdapter() {
     var grimLink: MutableMap<Long, String> = mutableMapOf()
@@ -480,10 +479,11 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
                 travelerCount++
             }
         }
-        var random = Random(System.currentTimeMillis())
+        var random = new Random();
         var randomMember = members[random.nextInt(members.count())]
         event.channel.sendMessage("${randomMember.effectiveName} has been selected").queue()
     }
+
 }
 
 
