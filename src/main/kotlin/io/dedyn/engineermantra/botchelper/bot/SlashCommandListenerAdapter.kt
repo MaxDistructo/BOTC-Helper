@@ -1,7 +1,7 @@
 package io.dedyn.engineermantra.botchelper.bot
 
-import ch.qos.logback.core.net.QueueFactory
 import io.dedyn.engineermantra.botchelper.bot.BotMain.managerStoryteller
+import io.dedyn.engineermantra.shared.discord.DiscordUtils
 import io.dedyn.engineermantra.shared.discord.DiscordUtils.getMentionedUser
 import net.dv8tion.jda.api.Permission
 import net.dv8tion.jda.api.entities.*
@@ -62,6 +62,10 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
                 "*n" -> nicknameMember(event.member, "N", Position.POSTFIX, false)
                 "*consult" -> event.message.addReaction(Emoji.fromUnicode("U+2714")).queue()
                 "*rp" -> randomPlayer(event)
+                "*joinqueue" -> joinOrLeaveQueue(event)
+                "*queue" -> checkQueue(event)
+                "*start" -> startGame(event)
+                "*end" -> endGame(event)
             }
         }
         if(event.isFromGuild && event.message.contentDisplay.contains("https://clocktower.live/#") || event.message.contentDisplay.contains("https://clocktower.online/#")){
@@ -483,6 +487,51 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
         var random = Random(System.currentTimeMillis())
         var randomMember = members[random.nextInt(members.count())]
         event.channel.sendMessage("${randomMember.effectiveName} has been selected").queue()
+    }
+
+    fun joinOrLeaveQueue(event: MessageReceivedEvent) {
+        if(!event.isFromGuild) return
+        if(stQueue.contains(event.member)){
+            stQueue.remove(event.member)
+            event.message.reply("You have left the ST Queue").queue()
+        }
+        else{
+            stQueue.add(event.member!!)
+            event.message.reply("You have joined the ST Queue").queue()
+        }
+    }
+
+    fun startGame(event: MessageReceivedEvent) {
+        if(!event.isFromGuild) return
+        if(stQueue.first() == event.member || event.member!!.hasPermission(Permission.MESSAGE_MANAGE)){
+            stQueue.remove(event.member)
+            event.channel.sendMessage("${event.member!!.effectiveName} is starting the game").queue()
+            createPoll(event, true)
+        }
+    }
+
+    fun endGame(event: MessageReceivedEvent) {
+        if(!event.isFromGuild) return
+        if(stQueue.first() == event.member || event.member!!.hasPermission(Permission.MESSAGE_MANAGE)){
+            event.channel.sendMessage("${stQueue.first().asMention} has completed their game. Pinging next ST.").queue()
+            stQueue.remove(stQueue.first())
+            event.channel.sendMessage("Next ST: ${stQueue.first().asMention}").queue()
+        }
+    }
+
+    fun checkQueue(event: MessageReceivedEvent) {
+        if (!event.isFromGuild) return
+        if (stQueue.isEmpty()) {
+            event.channel.sendMessage("ST Queue is empty").queue()
+        }
+        else {
+            val stQueueString = StringBuilder()
+            stQueueString.append("Current ST Queue:\n")
+            for (member in stQueue) {
+                stQueueString.append("${member.effectiveName}\n")
+            }
+            event.channel.sendMessageEmbeds(DiscordUtils.simpleTitledEmbed(event.member!!, "ST Queue", stQueueString.toString(), event.guild)).queue()
+        }
     }
 }
 
