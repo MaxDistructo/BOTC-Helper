@@ -3,6 +3,7 @@ package io.dedyn.engineermantra.botchelper.bot
 import io.dedyn.engineermantra.botchelper.bot.BotMain.managerStoryteller
 import io.dedyn.engineermantra.shared.discord.DiscordUtils
 import io.dedyn.engineermantra.shared.discord.DiscordUtils.getMentionedUser
+import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.Permission
 import net.dv8tion.jda.api.entities.*
 import net.dv8tion.jda.api.entities.channel.concrete.Category
@@ -14,6 +15,8 @@ import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent
 import net.dv8tion.jda.api.hooks.ListenerAdapter
 import net.dv8tion.jda.api.utils.messages.MessagePollData
+import org.json.JSONArray
+import java.net.URL
 import java.time.Duration
 import kotlin.random.Random
 
@@ -32,6 +35,7 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
             "grim" -> handleGrim(event)
             "storyteller" -> handleStoryteller(event)
             "cottage" -> handleCottage(event)
+            "admin" -> handleAdminCommands(event)
             else -> println("Command not found ${event.name}")
         }
     }
@@ -66,6 +70,7 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
                 "*queue" -> checkQueue(event)
                 "*start" -> startGame(event)
                 "*end" -> endGame(event)
+                "*role" -> getRoleInfo(event)
             }
         }
         if(event.isFromGuild && event.message.contentDisplay.contains("https://clocktower.live/#") || event.message.contentDisplay.contains("https://clocktower.online/#")){
@@ -74,6 +79,8 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
             }
         }
     }
+
+
 
     override fun onMessageReactionAdd(event: MessageReactionAddEvent) {
         if(!event.isFromGuild) return
@@ -547,6 +554,94 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
             }
             event.channel.sendMessageEmbeds(DiscordUtils.simpleTitledEmbed(event.member!!, "ST Queue", stQueueString.toString(), event.guild)).queue()
         }
+    }
+
+
+    fun getRoleDetails(roleName: String): Map<String, String?> {
+        // URL for the JSON file
+        val url = "https://raw.githubusercontent.com/nicholas-eden/townsquare/refs/heads/develop/src/roles.json"
+        val jsonString = URL(url).readText()
+        val jsonObject = JSONArray(jsonString)
+        for (i in 0 until jsonObject.length()) {
+            val roleObject = jsonObject.getJSONObject(i)
+            if (roleObject.optString("id") == roleName.toLowerCase()) {
+                return mapOf(
+                    "edition" to when (roleObject.optString("edition", "").toLowerCase()) {
+                        "bmr" -> "Blood Moon Rising"
+                        "tb" -> "Trouble Brewing"
+                        "snv" -> "Sects and Violets"
+                        else -> if (roleObject.optString("edition", "").isBlank()) "Experimental" else roleObject.optString("edition", "")
+                    },
+                    "team" to roleObject.optString("team", null),
+                    "setup" to roleObject.optString("setup", null),
+                    "ability" to roleObject.optString("ability", null),
+                    "name" to roleObject.optString("name", null)
+                )
+            }
+        }
+        return mapOf(
+            "edition" to null,
+            "team" to null,
+            "setup" to null,
+            "ability" to null,
+            "name" to null
+        )
+    }
+
+    fun String.capitalizeWords(): String {
+        return this.split(" ")
+            .joinToString(" ") { it.replaceFirstChar { char -> char.uppercaseChar() } }
+    }
+
+
+    fun getRoleInfo(event: MessageReceivedEvent) {
+        val roleName = event.message.contentRaw.split(" ").drop(1).joinToString("")
+        val roleInfo = getRoleDetails(roleName)
+        if(roleInfo["edition"] != null){
+            val embed = EmbedBuilder()
+                    .setTitle("${roleInfo["name"]} (${roleInfo["team"]?.capitalizeWords()}) - ${roleInfo["edition"]}")
+                    .setDescription("${roleInfo["ability"]?.capitalizeWords()}\n\nAffects Setup: ${roleInfo["setup"]?.capitalizeWords()}")
+                    .setUrl("https://wiki.bloodontheclocktower.com/$roleName")
+                    .build()
+            event.channel.sendMessageEmbeds(embed).queue()
+        }
+        else{
+            event.channel.sendMessage("Role not found").queue()
+        }
+    }
+
+
+    fun handleAdminCommands(event: SlashCommandInteractionEvent) {
+        when(event.subcommandName){
+            "nextst" -> {
+                val user = event.getOption("user")?.asMember
+                if (user != null) {
+                    val frontMember = stQueue.firstOrNull()
+                    if (frontMember == null || !frontMember.effectiveName.startsWith("(ST)")) {
+                        stQueue.add(0, user)
+                        event.reply("${user.effectiveName} has been added to the front of the queue").queue()
+                    } else {
+                        stQueue.add(1, user)
+                        event.reply("${user.effectiveName} has been added to the second position in the queue").queue()
+                    }
+                } else {
+                    event.reply("User not found").setEphemeral(true).queue()
+                }
+            }
+            "removest" -> {
+                val user = event.getOption("user")?.asMember
+                if (user != null) {
+                    if (stQueue.remove(user)) {
+                        event.reply("${user.effectiveName} has been removed from the queue").queue()
+                    } else {
+                        event.reply("${user.effectiveName} is not in the queue").setEphemeral(true).queue()
+                    }
+                } else {
+                    event.reply("User not found").setEphemeral(true).queue()
+                }
+            }
+        }
+
     }
 }
 

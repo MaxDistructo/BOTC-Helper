@@ -81,6 +81,20 @@ object BotMain {
                 .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_CHANNEL))
             ).complete()
         }
+        if(!commandNames.contains("admin")){
+            jda.upsertCommand(
+                Commands.slash("admin", "Admin commands")
+                .setGuildOnly(true)
+                .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.ADMINISTRATOR))
+                    .addSubcommands(
+                        SubcommandData("nextst", "Set a user to be the next Storyteller")
+                            .addOption(OptionType.USER, "user", "The user to be the next Storyteller", true),
+                        SubcommandData("removest", "Manually remove an st from the queue")
+                            .addOption(OptionType.USER, "user", "The user to be removed", true),
+                    )
+            ).complete()
+        }
+
         jda.getGuildById(1165357291629989979)!!.upsertCommand(
             Commands.slash("summon", "Summon all VC members")
                 .setDefaultPermissions(DefaultMemberPermissions.DISABLED)
