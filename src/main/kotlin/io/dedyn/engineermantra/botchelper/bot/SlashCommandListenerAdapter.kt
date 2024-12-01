@@ -23,6 +23,8 @@ import kotlin.random.Random
 class SlashCommandListenerAdapter: ListenerAdapter() {
     var grimLink: MutableMap<Long, String> = mutableMapOf()
     var stQueue: MutableList<Member> = mutableListOf()
+    var rolesJson: JSONArray = JSONArray()
+    var fabledJson: JSONArray = JSONArray()
     override fun onSlashCommandInteraction(event: SlashCommandInteractionEvent) {
         val time = System.currentTimeMillis()
         when(event.name){
@@ -560,10 +562,28 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
     fun getRoleDetails(roleName: String): Map<String, String?> {
         // URL for the JSON file
         val url = "https://raw.githubusercontent.com/nicholas-eden/townsquare/refs/heads/develop/src/roles.json"
-        val jsonString = URL(url).readText()
-        val jsonObject = JSONArray(jsonString)
-        for (i in 0 until jsonObject.length()) {
-            val roleObject = jsonObject.getJSONObject(i)
+        val fabledURL = "https://raw.githubusercontent.com/nicholas-eden/townsquare/refs/heads/develop/src/fabled.json"
+        var jsonString = URL(url).readText()
+        if(rolesJson.isEmpty){
+            rolesJson = JSONArray(jsonString)
+        }
+        if(fabledJson.isEmpty){
+            jsonString = URL(fabledURL).readText()
+            fabledJson = JSONArray(jsonString)
+        }
+        val combinedArray = JSONArray()
+        for (i in 0 until rolesJson.length()) {
+            combinedArray.put(rolesJson.getJSONObject(i))
+        }
+        for (i in 0 until fabledJson.length()) {
+            try {
+                combinedArray.put(fabledJson.getJSONObject(i))
+            } catch (e: Exception) {
+                println("Failed to add role to combinedArray: ${fabledJson.getJSONObject(i)}")
+            }
+        }
+        for (i in 0 until combinedArray.length()) {
+            val roleObject = combinedArray.getJSONObject(i)
             if (roleObject.optString("id") == roleName.toLowerCase()) {
                 return mapOf(
                     "edition" to when (roleObject.optString("edition", "").toLowerCase()) {
