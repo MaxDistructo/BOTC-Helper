@@ -108,14 +108,14 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
                 //Storyteller role
                 var role = event.guild.getRolesByName("Storyteller", true).firstOrNull()
                 if(role != null){
-                    event.guild.removeRoleFromMember(event.member, role)
+                    event.guild.removeRoleFromMember(event.member, role).queue()
                 }
                 grimLink[event.member.idLong] = ""
             }
         if(event.newNickname!!.startsWith("(ST)") || event.newNickname!!.startsWith("(Co-ST)")){
             var role = event.guild.getRolesByName("Storyteller", true).firstOrNull()
             if(role != null){
-                event.guild.addRoleToMember(event.member, role)
+                event.guild.addRoleToMember(event.member, role).queue()
             }
         }
     }
@@ -469,12 +469,13 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
             .addAnswer("Bad Moon Rising (BMR)")
             .addAnswer("Sects and Violets (S&V)")
             .setDuration(Duration.ofHours(1))
+            .setMultiAnswer(true)
         if(addCustom){
             pollData.addAnswer("Custom")
         }
-            event.channel.sendMessage("ST Asks:")
-                .setPoll(pollData.build())
-                .queue()
+        event.channel.sendMessage("${event.member!!.effectiveName} Asks:")
+            .setPoll(pollData.build())
+            .queue()
     }
 
     fun randomPlayer(event: MessageReceivedEvent) {
@@ -524,20 +525,23 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
         if(!event.isFromGuild) return
         if(stQueue.first() == event.member || event.member!!.hasPermission(Permission.MESSAGE_MANAGE)){
             stQueue.remove(event.member)
-            event.channel.sendMessage("${event.member!!.effectiveName} is starting the game").queue()
-            createPoll(event, true)
+            if(event.member != stQueue.first()){
+                event.channel.sendMessage("${event.member!!.effectiveName}} is starting the game for ${stQueue.first().user.globalName} (${stQueue.first().asMention})").queue()
+            }
+            else{
+                event.channel.sendMessage("${event.member!!.effectiveName} is starting the game").queue()
+                createPoll(event, true)
+            }
         }
     }
 
     fun endGame(event: MessageReceivedEvent) {
         if(!event.isFromGuild) return
-        var random = Random(System.currentTimeMillis())
+        //var random = Random(System.currentTimeMillis())
         if(stQueue.first() == event.member || event.member!!.hasPermission(Permission.MESSAGE_MANAGE)){
             event.channel.sendMessage("${stQueue.first().asMention} has completed their game. Pinging next ST.").queue()
             //Make this more frequent if people keep forgetting to do this
-            if((random.nextInt() % 4) == 0){
-                event.channel.sendMessage("Reminder to thank your ST!").queue()
-            }
+            event.channel.sendMessage("Reminder to thank your ST!").queue()
             stQueue.remove(stQueue.first())
             event.channel.sendMessage("Next ST: ${stQueue.first().asMention}").queue()
         }
