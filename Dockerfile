@@ -1,7 +1,7 @@
 FROM --platform=$BUILDPLATFORM gradle:8.11.0-jdk21-alpine as builder
 COPY . /app
 WORKDIR /app
-RUN gradle jar
+RUN gradle build
 RUN cp /app/build/libs/app.jar /app.jar
 
 FROM eclipse-temurin:21.0.5_11-jre-alpine
