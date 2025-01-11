@@ -26,6 +26,10 @@ class SpectatorListenerAdapter: ListenerAdapter() {
         //User Disconnected
         else if(event.channelJoined == null && event.channelLeft != null)
         {
+            //If the user is a spectator, remove them from the map.
+            if(BotMain.spectatorMap.values.any({it.contains(event.member.idLong)})){
+                BotMain.spectatorMap.values.forEach { it.remove(event.member.idLong) }
+            }
             return
         }
         //User Joined

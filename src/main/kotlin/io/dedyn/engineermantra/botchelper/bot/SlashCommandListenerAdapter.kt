@@ -73,6 +73,7 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
                 "*start" -> startGame(event)
                 "*end" -> endGame(event)
                 "*role" -> getRoleInfo(event)
+                "<@&1273992810969698334>" -> notifyMembers(event)
             }
         }
         if(event.isFromGuild && event.message.contentDisplay.contains("https://clocktower.live/#") || event.message.contentDisplay.contains("https://clocktower.online/#")){
@@ -81,6 +82,7 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
             }
         }
     }
+
 
 
 
@@ -192,6 +194,18 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
     fun spectateMember(event: MessageReceivedEvent) {
         val messageParts = event.message.contentRaw.split(" ")
         if (messageParts.size == 1) {
+            //check if user is in VC
+            var memberVC: VoiceChannel? = null
+            for (vc in event.guild.voiceChannels) {
+                if (vc.members.contains(event.member)) {
+                    memberVC = vc
+                    break
+                }
+            }
+            if (memberVC == null) {
+                event.channel.sendMessage("You must be in a voice channel to spectate someone").queue()
+                return
+            }
             val isSpectator = event.member!!.effectiveName.startsWith('!')
             if (!isSpectator) {
                 val memberName = event.member!!.effectiveName
@@ -201,7 +215,8 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
                 event.member!!.modifyNickname(event.member!!.effectiveName.substring(1)).complete()
                 removeMemberFromSpectatorMap(event.member!!.idLong)
             }
-        } else {
+        }
+        else {
             val targetUser: Member? = event.message.getMentionedUser()
             if (targetUser != null) {
                 addMemberToSpectatorMap(targetUser.idLong, event.member!!.idLong)
@@ -209,6 +224,14 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
             } else {
                 event.channel.sendMessage("I cannot find the user you have mentioned!").queue()
             }
+        }
+    }
+
+    private fun notifyMembers(event: MessageReceivedEvent) {
+        if(event.message.author.idLong == 872998851013918760){
+            var member = event.guild.getMemberById(228111371965956099)
+            val privateChannel = member?.user?.openPrivateChannel()?.complete()
+            privateChannel?.sendMessage("NEW BOTC GAME. WAKE UP!!!!!!!")?.queue()
         }
     }
 
@@ -235,6 +258,12 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
             BotMain.spectatorMap[targetUserId] = mutableListOf()
         }
         BotMain.spectatorMap[targetUserId]!!.add(memberId)
+        //Only allow spectating one person at a time
+        for(entry in BotMain.spectatorMap){
+            if(entry.value.contains(memberId) && entry.key != targetUserId){
+                entry.value.remove(memberId)
+            }
+        }
     }
 
     fun spectateMember(event: SlashCommandInteractionEvent){
