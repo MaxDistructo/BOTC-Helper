@@ -10,7 +10,7 @@ buildscript {
     }
 }
 plugins {
-    kotlin("jvm") version "2.0.21"
+    kotlin("jvm") version "2.1.10"
 }
 
 group = "io.dedyn.engineermantra"
