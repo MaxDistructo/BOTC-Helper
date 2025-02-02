@@ -68,7 +68,10 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
                 "*n" -> nicknameMember(event.member, "N", Position.POSTFIX, false)
                 "*consult" -> event.message.addReaction(Emoji.fromUnicode("U+2714")).queue()
                 "*rp" -> randomPlayer(event)
+                "*join" -> joinOrLeaveQueue(event)
                 "*joinqueue" -> joinOrLeaveQueue(event)
+                "*leave" -> joinOrLeaveQueue(event)
+                "*leavequeue" -> joinOrLeaveQueue(event)
                 "*queue" -> checkQueue(event)
                 "*start" -> startGame(event)
                 "*end" -> endGame(event)
@@ -690,6 +693,21 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
                         event.reply("${user.effectiveName} is not in the queue").setEphemeral(true).queue()
                     }
                 } else {
+                    event.reply("User not found").setEphemeral(true).queue()
+                }
+            }
+            "addst" -> {
+                val user = event.getOption("user")?.asMember
+                if(user != null){
+                    if(stQueue.contains(user)){
+                        event.reply("${user.effectiveName} is already in the queue").setEphemeral(true).queue()
+                    }
+                    else{
+                        stQueue.add(user)
+                        event.reply("${user.effectiveName} has been added to the queue").queue()
+                    }
+                }
+                else{
                     event.reply("User not found").setEphemeral(true).queue()
                 }
             }
