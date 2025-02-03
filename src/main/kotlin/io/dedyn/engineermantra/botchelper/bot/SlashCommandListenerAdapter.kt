@@ -620,9 +620,9 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
         }
         for (i in 0 until combinedArray.length()) {
             val roleObject = combinedArray.getJSONObject(i)
-            if (roleObject.optString("id") == roleName.toLowerCase()) {
+            if (roleObject.optString("id") == roleName.lowercase()) {
                 return mapOf(
-                    "edition" to when (roleObject.optString("edition", "").toLowerCase()) {
+                    "edition" to when (roleObject.optString("edition", "").lowercase()) {
                         "bmr" -> "Blood Moon Rising"
                         "tb" -> "Trouble Brewing"
                         "snv" -> "Sects and Violets"
