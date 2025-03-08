@@ -624,7 +624,7 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
                 return mapOf(
                     "edition" to when (roleObject.optString("edition", "").lowercase()) {
                         "bmr" -> "Blood Moon Rising"
-                        "tb" -> "Trouble Brewing"
+                        "tb" -> "Trouble Brewing"guild
                         "snv" -> "Sects and Violets"
                         else -> if (roleObject.optString("edition", "").isBlank()) "Experimental" else roleObject.optString("edition", "")
                     },
