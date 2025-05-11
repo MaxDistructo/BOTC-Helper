@@ -81,6 +81,13 @@ object BotMain {
                 .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_CHANNEL))
             ).complete()
         }
+        if(!commandNames.contains("creategrim")){
+            jda.upsertCommand(
+                Commands.slash("creategrim", "Create a new grim json with the active players")
+                .setGuildOnly(true)
+                .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_CHANNEL))
+            ).complete()
+        }
         jda.getGuildById(1165357291629989979)!!.upsertCommand(
             Commands.slash("summon", "Summon all VC members")
                 .setDefaultPermissions(DefaultMemberPermissions.DISABLED)

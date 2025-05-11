@@ -6,11 +6,12 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.0.10")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.20")
     }
 }
 plugins {
-    kotlin("jvm") version "2.0.10"
+    kotlin("jvm") version "2.1.20"
+    kotlin("plugin.serialization") version "2.1.20"
 }
 
 group = "io.dedyn.engineermantra"
@@ -27,13 +28,14 @@ repositories {
 
 // In this section you declare the dependencies for your production and test code
 dependencies {
-    implementation(group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version = "2.0.10")
+    implementation(group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version = "2.1.20")
     implementation(group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version = "1.8.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation(group = "org.json", name = "json", version = "20240303")
-    implementation(group = "ch.qos.logback", name = "logback-classic", version = "1.5.6")
+    implementation(group = "ch.qos.logback", name = "logback-classic", version = "1.5.13")
     //Due to bugs in the latest beta, we want to pull the latest commit from Jitpack instead of Maven.
     //implementation(group = "com.github.discord-jda", name = "JDA", version = "79b1b560b1")
-    implementation(group = "net.dv8tion", name = "JDA", version = "5.1.0")
+    implementation(group = "net.dv8tion", name = "JDA", version = "5.5.1")
     implementation(group = "club.minnced", name = "discord-webhooks", version = "0.8.4")
     //implementation(group = "org.mariadb.jdbc", name = "mariadb-java-client", version = "3.4.1")
     implementation(group = "net.java.dev.jna", name = "jna", version = "5.14.0")

@@ -2,7 +2,10 @@ package io.dedyn.engineermantra.botchelper.bot
 
 import ch.qos.logback.core.net.QueueFactory
 import io.dedyn.engineermantra.botchelper.bot.BotMain.managerStoryteller
+import io.dedyn.engineermantra.botchelper.models.ClocktowerJson
 import io.dedyn.engineermantra.shared.discord.DiscordUtils.getMentionedUser
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
 import net.dv8tion.jda.api.Permission
 import net.dv8tion.jda.api.entities.*
 import net.dv8tion.jda.api.entities.channel.concrete.Category
@@ -31,6 +34,7 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
             "grim" -> handleGrim(event)
             "storyteller" -> handleStoryteller(event)
             "cottage" -> handleCottage(event)
+            "creategrim" -> handleCreateGrim(event)
             else -> println("Command not found ${event.name}")
         }
     }
@@ -301,7 +305,7 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
     }
 
     val knownPrefixes: List<String> = listOf("!", "(ST) ", "(Co-ST) ", "(T) ")
-    val knownSuffixes: List<String> = listOf(" [BRB]", " [AFK]")
+    val knownSuffixes: List<String> = listOf(" [BRB]", " [AFK]", " [N]")
 
     fun nicknameMember(member: Member?, addition: String, position: Position, removeOld: Boolean){
         if(member == null) return
@@ -432,7 +436,6 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
         }
     }
 
-
     fun createPoll(event: MessageReceivedEvent, addCustom: Boolean){
         val pollData = MessagePollData.builder("Which Script?")
             .addAnswer("Trouble Brewing (TB)")
@@ -445,6 +448,56 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
             event.channel.sendMessage("ST Asks:")
                 .setPoll(pollData.build())
                 .queue()
+    }
+
+    fun handleCreateGrim(event: SlashCommandInteractionEvent){
+        val channelMembers = mutableListOf<Member>()
+        if(event?.guild == null) event.reply("This command is guild ONLY!").queue()
+        var category: Category? = null
+        for(vc in event.guild!!.voiceChannels) {
+            if(vc.members.contains(event.member)) {
+                category = vc.parentCategory
+            }
+        }
+        if(category == null) {
+            event.reply("Category not found. Notify <@!228111371965956099> if you haven't seen this before").queue()
+            return
+        }
+        for(channel in category.channels) {
+            if(channel is VoiceChannel) {
+                channelMembers.addAll(channel.members)
+            }
+        }
+        var members = mutableListOf<Member>();
+        for(member in channelMembers){
+            if(!member.effectiveName.startsWith("!") && !member.effectiveName.startsWith("(Co-ST)") && !member.effectiveName.startsWith("(ST)")){
+                members.add(member)
+            }
+        }
+        var gameState = ClocktowerJson.GameState(
+            bluffs = mutableListOf("null", "null", "null"),
+            edition = ClocktowerJson.Edition(id = "tb"),
+            roles = "",
+            fabled = mutableListOf(),
+            players = mutableListOf()
+        )
+        for(member in members){
+            val player = ClocktowerJson.Player(
+                name = member.effectiveName,
+                id = "",
+                connected = true,
+                role = null,
+                alignmentIndex = 0,
+                reminders = emptyList(),
+                isVoteless = false,
+                hasTwoVotes = false,
+                hasResponded = null,
+                isDead = false,
+                pronouns = "",
+            )
+            gameState.players.add(player)
+        }
+        event.reply("Grim JSON: ```json\n${Json.encodeToJsonElement(gameState)}```").queue()
     }
 
 }
