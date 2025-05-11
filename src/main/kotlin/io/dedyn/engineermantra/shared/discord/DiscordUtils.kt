@@ -149,55 +149,6 @@ object DiscordUtils {
         return false
     }
 
-    fun jaroWinklerSimilarity(s1: String, s2: String): Double {
-        val s1Len = s1.length
-        val s2Len = s2.length
-
-        if (s1Len == 0 && s2Len == 0) return 1.0
-        if (s1Len == 0 || s2Len == 0) return 0.0
-
-        val matchDistance = (min(s1Len, s2Len) / 2) - 1
-
-        val s1Matches = BooleanArray(s1Len)
-        val s2Matches = BooleanArray(s2Len)
-
-        var matches = 0
-        var transpositions = 0
-        // Find matches
-        for (i in s1.indices) {
-            val start = maxOf(0, i - matchDistance)
-            val end = min(i + matchDistance + 1, s2Len)
-
-            for (j in start until end) {
-                if (!s2Matches[j] && s1[i] == s2[j]) {
-                    s1Matches[i] = true
-                    s2Matches[j] = true
-                    matches++
-                    break
-                }
-            }
-        }
-        if (matches == 0) return 0.0
-        // Find transpositions
-        var k = 0
-        for (i in s1.indices) {
-            if (s1Matches[i]) {
-                while (!s2Matches[k]) k++
-                if (s1[i] != s2[k]) transpositions++
-                k++
-            }
-        }
-        transpositions /= 2
-        // Jaro similarity
-        val jaro = ((matches.toDouble() / s1Len) +
-                (matches.toDouble() / s2Len) +
-                ((matches - transpositions).toDouble() / matches)) / 3.0
-        // Jaro-Winkler adjustment
-        val prefixLength = min(4, s1.commonPrefixWith(s2).length)
-        val p = 0.1 // scaling factor
-        return jaro + (prefixLength * p * (1 - jaro))
-    }
-
     fun Message.getMentionedUser(): Member?{
         if(mentions.members.isNotEmpty()){
             return mentions.members[0]
@@ -205,7 +156,6 @@ object DiscordUtils {
         var splitStr = contentRaw.split(' ')
         var word = splitStr[1]
         var partialMatch: Member? = null
-        var partialMatchPercent = 0.0
         val potentialMembers = guild.getMembersByEffectiveName(word, true)
         val potentialMembersFullName = guild.getMembersByName(word, true)
         if(potentialMembersFullName.count() > 0){
@@ -216,47 +166,40 @@ object DiscordUtils {
         }
         for(vc in guild.voiceChannels){
             for(member in vc.members){
-                val matchPercent = jaroWinklerSimilarity(member.effectiveName, word)
-                println("Match Percentage: ${member.effectiveName}, $word - $matchPercent")
-                if(matchPercent > partialMatchPercent){
-                    partialMatchPercent = matchPercent
-                    partialMatch = member
+                if(member.effectiveName.contains(word)){
+                    return member;
+                }
+                if(member.user.name.contains(word)){
+                    return member;
                 }
             }
         }
         return partialMatch
     }
 
-    /* TODO: Rewrite as extensions on JDA object
-    fun addRolesInServer(userId: Long, serverId: Long, roles: List<Role>)
-    {
-        val guild = BotMain.jda.getGuildById(serverId)!!
-        val user = guild.getMemberById(userId)
-        for(role in roles)
-        {
-            if(user != null)
-            {
-                guild.addRoleToMember(user,getOrCreateRole(serverId, role)).queue()
+    fun JDA.addRolesToUser(userId: Long, serverId: Long, roles: List<Role>){
+        var guild = getGuildById(serverId)!!
+        var user = guild.getMemberById(userId)
+        for(role in roles){
+            if(user != null){
+                guild.addRoleToMember(user, role).queue()
             }
         }
     }
 
-    fun removeRolesInServer(userId: Long, serverId: Long, roles: List<Role>)
-    {
-        val guild = BotMain.jda.getGuildById(serverId)!!
-        val user = guild.getMemberById(userId)
-        for(role in roles)
-        {
-            if(user != null)
-            {
-                guild.removeRoleFromMember(user,getOrCreateRole(serverId, role))
+    fun JDA.removeRolesInServer(userId: Long, serverId: Long, roles: List<Role>){
+        var guild = getGuildById(serverId)!!
+        var user = guild.getMemberById(userId)
+        for(role in roles){
+            if(user != null){
+                guild.removeRoleFromMember(user, role).queue()
             }
         }
     }
 
-    fun getOrCreateRole(serverId: Long, role: Role): Role
+    fun JDA.getOrCreateRole(serverId: Long, role: Role): Role
     {
-        val guild = BotMain.jda.getGuildById(serverId)!!
+        val guild = getGuildById(serverId)!!
         val potentialRoles = guild.getRolesByName(role.name, false)
         if (potentialRoles.size > 0)
         {
@@ -273,9 +216,9 @@ object DiscordUtils {
         }
     }
 
-    fun getRoleFromServer(serverId: Long, roleName: String): Role?
+    fun JDA.getRoleFromServer(serverId: Long, roleName: String): Role?
     {
-        val guild = BotMain.jda.getGuildById(serverId)!!
+        val guild = getGuildById(serverId)!!
         val roles = guild.getRolesByName(roleName, false)
         if(roles.size > 0)
         {
@@ -283,5 +226,4 @@ object DiscordUtils {
         }
         return null
     }
-     */
 }
