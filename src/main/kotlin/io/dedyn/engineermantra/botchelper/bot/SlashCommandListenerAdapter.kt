@@ -41,6 +41,7 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
             "storyteller" -> handleStoryteller(event)
             "cottage" -> handleCottage(event)
             "admin" -> handleAdminCommands(event)
+            "creategrim" -> handleCreateGrim(event)
             else -> println("Command not found ${event.name}")
         }
     }
@@ -80,6 +81,7 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
                 "*end" -> endGame(event)
                 "*role" -> getRoleInfo(event)
                 "<@&1273992810969698334>" -> notifyMembers(event)
+
             }
         }
         if(event.isFromGuild && event.message.contentDisplay.contains("https://clocktower.live/#") || event.message.contentDisplay.contains("https://clocktower.online/#")){
@@ -626,7 +628,7 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
                 return mapOf(
                     "edition" to when (roleObject.optString("edition", "").lowercase()) {
                         "bmr" -> "Blood Moon Rising"
-                        "tb" -> "Trouble Brewing"guild
+                        "tb" -> "Trouble Brewing"
                         "snv" -> "Sects and Violets"
                         else -> if (roleObject.optString("edition", "").isBlank()) "Experimental" else roleObject.optString("edition", "")
                     },
@@ -718,7 +720,7 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
     }
     fun handleCreateGrim(event: SlashCommandInteractionEvent){
         val channelMembers = mutableListOf<Member>()
-        if(event?.guild == null) event.reply("This command is guild ONLY!").queue()
+        if(event.guild == null) event.reply("This command is guild ONLY!").queue()
         var category: Category? = null
         for(vc in event.guild!!.voiceChannels) {
             if(vc.members.contains(event.member)) {
@@ -734,13 +736,13 @@ class SlashCommandListenerAdapter: ListenerAdapter() {
                 channelMembers.addAll(channel.members)
             }
         }
-        var members = mutableListOf<Member>();
+        val members = mutableListOf<Member>();
         for(member in channelMembers){
             if(!member.effectiveName.startsWith("!") && !member.effectiveName.startsWith("(Co-ST)") && !member.effectiveName.startsWith("(ST)")){
                 members.add(member)
             }
         }
-        var gameState = ClocktowerJson.GameState(
+        val gameState = ClocktowerJson.GameState(
             bluffs = mutableListOf("null", "null", "null"),
             edition = ClocktowerJson.Edition(id = "tb"),
             roles = "",
