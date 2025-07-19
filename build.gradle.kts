@@ -1,3 +1,4 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 
@@ -6,12 +7,12 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.20")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.0")
     }
 }
 plugins {
-    kotlin("jvm") version "2.1.20"
-    kotlin("plugin.serialization") version "2.1.20"
+    kotlin("jvm") version "2.2.0"
+    kotlin("plugin.serialization") version "2.2.0"
 }
 
 group = "io.dedyn.engineermantra"
@@ -28,10 +29,10 @@ repositories {
 
 // In this section you declare the dependencies for your production and test code
 dependencies {
-    implementation(group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version = "2.1.20")
+    implementation(group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version = "2.2.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation(group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version = "1.10.2")
-    implementation(group = "org.json", name = "json", version = "20240303")
+    implementation(group = "org.json", name = "json", version = "20250517")
     implementation(group = "ch.qos.logback", name = "logback-classic", version = "1.5.18")
     //Due to bugs in the latest beta, we want to pull the latest commit from Jitpack instead of Maven.
     //implementation(group = "com.github.discord-jda", name = "JDA", version = "79b1b560b1")
@@ -57,8 +58,8 @@ kotlin {
     }
 }
 tasks.withType<KotlinCompile> {
-    kotlinOptions {
-        jvmTarget = "21"
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_21)
     }
 }
 
