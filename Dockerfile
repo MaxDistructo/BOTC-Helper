@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM gradle:9.0.0-jdk21-alpine as builder
+FROM --platform=$BUILDPLATFORM gradle:9.1.0-jdk21-alpine as builder
 COPY . /app
 WORKDIR /app
 RUN gradle build
