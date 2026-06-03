@@ -43,7 +43,7 @@ dependencies {
     implementation(group = "net.java.dev.jna", name = "jna-platform", version = "5.17.0")
     //Instead of using Maria/MySQL, use a CassandraDB which is a NoSQL implementation.
     //This better represents the data we wish to store
-    implementation("org.apache.cassandra:java-driver-core:4.19.0")
+    implementation("org.apache.cassandra:java-driver-core:4.19.3")
 }
 
 sourceSets {
