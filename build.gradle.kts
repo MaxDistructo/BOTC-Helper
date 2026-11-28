@@ -30,7 +30,7 @@ repositories {
 // In this section you declare the dependencies for your production and test code
 dependencies {
     implementation(group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version = "2.2.20")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
     implementation(group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version = "1.10.2")
     implementation(group = "org.json", name = "json", version = "20250517")
     implementation(group = "ch.qos.logback", name = "logback-classic", version = "1.5.18")
